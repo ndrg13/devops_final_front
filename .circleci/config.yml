@@ -1,0 +1,94 @@
+version: 2.1
+jobs: 
+  install:
+    docker:
+      - image: circleci/node:latest
+    steps: 
+      - checkout
+      - restore_cache: 
+          keys: 
+            - yarn-packages-{{ checksum "yarn.lock" }}-{{ .Environment.CACHE_VERSION }}
+            - yarn-packages
+      - run: yarn global add node-gyp && yarn install
+      - save_cache:
+          key: yarn-packages-{{ checksum "yarn.lock" }}-{{ .Environment.CACHE_VERSION }}
+          paths: 
+            - node_modules
+  test: 
+    docker:
+      - image: circleci/node:latest
+    steps: 
+      - checkout
+      - restore_cache: 
+          keys: 
+            - yarn-packages-{{ checksum "yarn.lock" }}-{{ .Environment.CACHE_VERSION }}
+      - run:
+          name: Launch test 
+          command: yarn test
+  prod-build: 
+    docker:
+      - image: circleci/node:latest
+    steps: 
+      - checkout
+      - restore_cache: 
+          keys: 
+            - yarn-packages-{{ checksum "yarn.lock" }}-{{ .Environment.CACHE_VERSION }}
+      - run:
+          name: Build for production 
+          command : yarn run build
+      - run:
+          name: Copy build to workspace
+          command: |
+            cp dist/ /tmp/dist -r
+      - store_artifacts:
+          path: /tmp/dist
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - dist
+  deploy-netlify: 
+    docker:
+      - image: circleci/node:latest
+    working_directory: ~/deploy-netlfify
+    steps:
+      - attach_workspace:
+          at: /tmp
+      - run:
+          name: Deploy app
+          command: |
+            sudo npm install -g --silent netlify-cli
+            netlify deploy --prod --auth $NETLIFY_AUTH_TOKEN --dir=/tmp/dist --site $NETLIFY_SITE_ID
+  docker-build-push:
+    working_directory: /dockerapp
+    docker:
+      - image: docker:17.05.0-ce-git
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name:  dockerize the app 
+          command: |
+            docker build --cache-from=app -t app .
+      - run: 
+          name: Publish app to docker hub
+          command: |
+            docker login -u $DOCKER_HUB_USERNAME -p $DOCKER_HUB_PASSWORD
+            docker tag app $DOCKER_HUB_USERNAME/tp-devops-front:$CIRCLE_BUILD_NUM
+            docker tag app $DOCKER_HUB_USERNAME/tp-devops-front:latest
+            docker push $DOCKER_HUB_USERNAME/tp-devops-front:$CIRCLE_BUILD_NUM
+            docker push $DOCKER_HUB_USERNAME/tp-devops-front:latest
+workflows:
+  build_deploy: 
+    jobs: 
+      - install
+      - prod-build:
+          requires: 
+            - install
+      - deploy-netlify: 
+          context: netlify_devops_final
+          requires: 
+            - prod-build 
+      - docker-build-push:
+          context: Docker
+          requires: 
+            - install
