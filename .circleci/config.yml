@@ -72,11 +72,11 @@ jobs:
       - run: 
           name: Publish app to docker hub
           command: |
-            docker login -u $DOCKER_HUB_USERNAME -p $DOCKER_HUB_PASSWORD
-            docker tag app $DOCKER_HUB_USERNAME/tp-devops-front:$CIRCLE_BUILD_NUM
-            docker tag app $DOCKER_HUB_USERNAME/tp-devops-front:latest
-            docker push $DOCKER_HUB_USERNAME/tp-devops-front:$CIRCLE_BUILD_NUM
-            docker push $DOCKER_HUB_USERNAME/tp-devops-front:latest
+            docker login -u $DOCKER_ID -p $DOCKER_PASSWORD
+            docker tag app $DOCKER_ID/tp-devops-front:$CIRCLE_BUILD_NUM
+            docker tag app $DOCKER_ID/tp-devops-front:latest
+            docker push $DOCKER_ID/tp-devops-front:$CIRCLE_BUILD_NUM
+            docker push $DOCKER_ID/tp-devops-front:latest
 workflows:
   build_deploy: 
     jobs: 
